@@ -4,8 +4,8 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
 export async function GET(
-  req: NextRequest, 
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }  // 👈 params must be awaited now
 ) {
   const session = await getServerSession(authOptions)
 
@@ -13,9 +13,11 @@ export async function GET(
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
   }
 
-  // Check the plan belongs to the merchant
+  const { id } = await context.params   // 👈 await the promise
+
+  // Check the plan belongs to this merchant
   const plan = await prisma.subscriptionPlan.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: { merchant: true },
   })
 
@@ -25,7 +27,7 @@ export async function GET(
 
   // Get list of subscribers for this plan
   const subscribers = await prisma.userSubscription.findMany({
-    where: { planId: params.id },
+    where: { planId: id },
     include: { user: true },
   })
 
