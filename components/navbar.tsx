@@ -3,9 +3,20 @@
 import Link from "next/link"
 import { useSession, signOut } from "next-auth/react"
 
+interface ExtendedUser {
+  id?: string
+  email?: string | null
+  role?: string
+}
+
+interface ExtendedSession {
+  user?: ExtendedUser
+}
+
 export default function Navbar() {
   const { data: session, status } = useSession()
-  const role = (session?.user as any)?.role
+  const extendedSession = session as ExtendedSession
+  const role = extendedSession?.user?.role
 
   return (
     <nav className="bg-gray-900 text-white px-6 py-3 flex justify-between items-center">
@@ -46,7 +57,7 @@ export default function Navbar() {
         ) : status === "authenticated" ? (
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-300">
-              {session.user?.email} ({role})
+              {extendedSession.user?.email} ({role})
             </span>
             <button
               onClick={() => signOut({ callbackUrl: "/" })}
