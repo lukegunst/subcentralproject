@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma"
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }   // 👈 must await now
 ) {
   const session = await getServerSession(authOptions)
 
@@ -14,27 +14,26 @@ export async function DELETE(
   }
 
   try {
-    // Verify the subscription belongs to the current user
+    const { id } = await context.params   // 👈 await the params
+
+    // Verify subscription belongs to user
     const subscription = await prisma.userSubscription.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!subscription || subscription.userId !== session.user.id) {
       return NextResponse.json({ message: "Subscription not found" }, { status: 404 })
     }
 
-    // Update subscription status to cancelled
+    // Cancel subscription
     await prisma.userSubscription.update({
-      where: { id: params.id },
-      data: { 
-        status: "CANCELLED", 
-        cancelledAt: new Date() 
-      },
+      where: { id },
+      data: { status: "CANCELLED", cancelledAt: new Date() },
     })
 
     return NextResponse.json({ message: "Subscription cancelled successfully" }, { status: 200 })
-  } catch (err) {
-    console.error(err)
+  } catch (e) {
+    console.error("Error cancelling subscription:", e)
     return NextResponse.json({ message: "Error cancelling subscription" }, { status: 500 })
   }
 }

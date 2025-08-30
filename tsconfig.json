@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "target": "es5",
     "lib": [
       "dom",
       "dom.iterable",
@@ -9,7 +8,6 @@
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
-    "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
@@ -18,32 +16,27 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    /* ✅ Paths / Aliases */
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
     "baseUrl": ".",
     "paths": {
       "@/*": [
         "./*"
       ]
     },
-    /* ✅ Types */
-    "types": [
-      "node",
-      "react",
-      "next",
-      "next/types",
-      "next-auth"
+    "typeRoots": [
+      "./types",
+      "./node_modules/@types"
     ],
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ]
+    "target": "ES2017"
   },
   "include": [
+    "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    "next-auth.d.ts",
-    "next-env.d.ts",
     ".next/types/**/*.ts"
   ],
   "exclude": [
