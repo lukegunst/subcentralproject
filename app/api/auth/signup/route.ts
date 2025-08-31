@@ -1,45 +1,48 @@
-import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
-import bcrypt from "bcryptjs"
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import bcrypt from 'bcryptjs'
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await req.json()
-    const { name, email, password, role, businessName } = body
+    const { email, password, role, businessName } = await request.json()
 
-    // check existing user
-    const existing = await prisma.user.findUnique({ where: { email } })
-    if (existing) {
-      return NextResponse.json({ message: "User already exists" }, { status: 400 })
-    }
-
-    // hash password
-    const hashedPassword = await bcrypt.hash(password, 10)
-
-    // create user
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        role: role || "USER",
-      },
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email }
     })
 
-    // if merchant, create merchant profile
-    if (role === "MERCHANT") {
-      await prisma.merchant.create({
-        data: {
-          userId: user.id,
-          businessName: businessName || name || "My Business",
-          contactEmail: email,
-        },
-      })
+    if (existingUser) {
+      return NextResponse.json(
+        { error: 'User already exists' },
+        { status: 400 }
+      )
     }
 
-    return NextResponse.json({ message: "User created successfully" }, { status: 201 })
-  } catch (err) {
-    console.error("Signup error:", err)
-    return NextResponse.json({ message: "Internal Server Error" }, { status: 500 })
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 12)
+
+    // Create user
+    const user = await prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        role: role || 'USER',
+        businessName: role === 'MERCHANT' ? businessName : null,
+      }
+    })
+
+    // Remove password from response
+    const { password: _, ...userWithoutPassword } = user
+
+    return NextResponse.json(
+      { message: 'User created successfully', user: userWithoutPassword },
+      { status: 201 }
+    )
+  } catch (error) {
+    console.error('Signup error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }

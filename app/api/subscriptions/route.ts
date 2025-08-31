@@ -1,44 +1,59 @@
-import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import type { Session } from 'next-auth'
 
-export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+// GET = Fetch current user's subscriptions
+export async function GET() {
+  const session: Session | null = await getServerSession(authOptions)
 
-  if (!session || session.user.role !== "USER") {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  try {
-    const { planId } = await req.json()
-
-    // Check if already subscribed
-    const existing = await prisma.userSubscription.findUnique({
-      where: {
-        userId_planId: {
-          userId: session.user.id,
-          planId: planId,
-        },
-      },
-    })
-
-    if (existing) {
-      return NextResponse.json({ message: "Already subscribed" }, { status: 400 })
+  const subscriptions = await prisma.userSubscription.findMany({
+    where: { userId: session.user.id },
+    include: {
+      plan: {
+        include: {
+          merchant: {
+            select: {
+              id: true,
+              businessName: true,
+              email: true
+            }
+          }
+        }
+      }
     }
+  })
 
-    // Create a subscription (mock — no payments yet)
-    await prisma.userSubscription.create({
-      data: {
-        userId: session.user.id,
-        planId: planId,
-        status: "ACTIVE",
-      },
-    })
+  return NextResponse.json(subscriptions)
+}
 
-    return NextResponse.json({ message: "Subscribed!" }, { status: 201 })
-  } catch (err) {
-    console.error(err)
-    return NextResponse.json({ message: "Server error" }, { status: 500 })
+// DELETE = Cancel one of the user’s subscriptions
+export async function DELETE(request: NextRequest) {
+  const session: Session | null = await getServerSession(authOptions)
+
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { subscriptionId } = await request.json()
+
+  const subscription = await prisma.userSubscription.findUnique({
+    where: { id: subscriptionId }
+  })
+
+  if (!subscription || subscription.userId !== session.user.id) {
+    return NextResponse.json({ error: 'Not found or unauthorized' }, { status: 404 })
+  }
+
+  const updated = await prisma.userSubscription.update({
+    where: { id: subscriptionId },
+    data: { status: 'cancelled' }
+  })
+
+  return NextResponse.json({ message: 'Subscription cancelled', subscription: updated })
 }

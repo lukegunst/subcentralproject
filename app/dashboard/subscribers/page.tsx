@@ -1,66 +1,65 @@
-import { getServerSession } from "next-auth"
+import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { redirect } from "next/navigation"
 
 export default async function SubscribersPage() {
   const session = await getServerSession(authOptions)
 
-  if (!session || session.user.role !== "MERCHANT") {
-    return <div className="p-6">Unauthorized</div>
+  if (!session?.user) {
+    redirect("/auth/signin")
   }
 
-  // ✅ Find Merchant linked to this user
-  const merchant = await prisma.merchant.findUnique({
-    where: { userId: session.user.id },
+  // Only merchants can access
+  const merchant = await prisma.user.findUnique({
+    where: { id: session.user.id }
   })
 
-  if (!merchant) {
-    return <div className="p-6">No merchant profile found.</div>
+  if (!merchant || merchant.role !== "MERCHANT") {
+    redirect("/dashboard")
   }
 
-  // ✅ Get all plans for this merchant
-  const plans = await prisma.subscriptionPlan.findMany({
-    where: { merchantId: merchant.id },
-    include: {
-      subscriptions: {
-        include: { user: true },
-      },
+  // Fetch subscribers to this merchant’s plans
+  const subscribers = await prisma.userSubscription.findMany({
+    where: {
+      plan: { merchantId: merchant.id }
     },
+    include: {
+      user: { select: { email: true } },
+      plan: { select: { name: true, price: true, interval: true } },
+    },
+    orderBy: {
+      createdAt: "desc"
+    }
   })
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">My Subscribers</h1>
+    <div className="min-h-screen bg-background p-8">
+      <div className="container mx-auto">
+        <h1 className="text-3xl font-bold mb-6">Your Subscribers</h1>
 
-      {plans.length === 0 ? (
-        <p>You have not created any plans yet.</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {plans.map(plan => (
-            <Card key={plan.id}>
-              <CardHeader>
-                <CardTitle>
-                  {plan.title} ({plan.subscriptions.length} Subscribers)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {plan.subscriptions.length === 0 ? (
-                  <p className="text-sm text-gray-500">No subscribers yet</p>
-                ) : (
-                  <ul className="space-y-2">
-                    {plan.subscriptions.map(sub => (
-                      <li key={sub.id} className="text-sm">
-                        {sub.user.email} – {sub.status}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+        {subscribers.length === 0 ? (
+          <p className="text-muted-foreground">You don’t have any subscribers yet.</p>
+        ) : (
+          <div className="space-y-4">
+            {subscribers.map((sub) => (
+              <div key={sub.id} className="border rounded-lg p-4 bg-card flex justify-between items-center">
+                <div>
+                  <p className="font-semibold">{sub.user.email}</p>
+                  <p className="text-sm text-muted-foreground">
+                    subscribed to <strong>{sub.plan.name}</strong> (${sub.plan.price}/{sub.plan.interval})
+                  </p>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded ${
+                  sub.status === "active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                }`}>
+                  {sub.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

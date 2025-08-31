@@ -1,35 +1,96 @@
-import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import type { Session } from 'next-auth'
 
 export async function GET(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }  // 👈 params must be awaited now
+  request: NextRequest,
+  { params }: { params: { id: string } }
 ) {
-  const session = await getServerSession(authOptions)
+  try {
+    const session: Session | null = await getServerSession(authOptions)
 
-  if (!session || session.user.role !== "MERCHANT") {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    const planId = params.id
+
+    // Check if plan exists and belongs to the current merchant
+    const plan = await prisma.plan.findUnique({
+      where: { id: planId },
+      include: {
+        merchant: {
+          select: {
+            id: true,
+            businessName: true,
+          }
+        }
+      }
+    })
+
+    if (!plan) {
+      return NextResponse.json(
+        { error: 'Plan not found' },
+        { status: 404 }
+      )
+    }
+
+    // Check if current user is the merchant who owns this plan
+    if (plan.merchantId !== session.user.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized - You can only view subscribers of your own plans' },
+        { status: 403 }
+      )
+    }
+
+    // Fetch all subscribers for this plan
+    const subscribers = await prisma.userSubscription.findMany({
+      where: {
+        planId: planId,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    })
+
+    return NextResponse.json({
+      plan: {
+        id: plan.id,
+        name: plan.name,
+        description: plan.description,
+        price: plan.price,
+        interval: plan.interval,
+        merchant: plan.merchant,
+      },
+      subscribers: subscribers.map(sub => ({
+        id: sub.id,
+        status: sub.status,
+        createdAt: sub.createdAt,
+        updatedAt: sub.updatedAt,
+        user: sub.user,
+      })),
+      totalSubscribers: subscribers.length,
+      activeSubscribers: subscribers.filter(sub => sub.status === 'active').length,
+    })
+  } catch (error) {
+    console.error('Error fetching plan subscribers:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch subscribers' },
+      { status: 500 }
+    )
   }
-
-  const { id } = await context.params   // 👈 await the promise
-
-  // Check the plan belongs to this merchant
-  const plan = await prisma.subscriptionPlan.findUnique({
-    where: { id },
-    include: { merchant: true },
-  })
-
-  if (!plan || plan.merchantId !== session.user.id) {
-    return NextResponse.json({ message: "Not found" }, { status: 404 })
-  }
-
-  // Get list of subscribers for this plan
-  const subscribers = await prisma.userSubscription.findMany({
-    where: { planId: id },
-    include: { user: true },
-  })
-
-  return NextResponse.json(subscribers)
 }
