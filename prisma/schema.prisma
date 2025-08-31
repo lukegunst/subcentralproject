@@ -1,3 +1,6 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,14 +16,15 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String?
-  access_token      String?
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String?
+  id_token          String? @db.Text
   session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -34,20 +38,28 @@ model Session {
 }
 
 model User {
-  id            String             @id @default(cuid())
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
   name          String?
-  email         String             @unique
-  password      String?
-  emailVerified DateTime?
-  image         String?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  role          String    @default("CUSTOMER")
+  
+  // ✅ Profile fields
+  phone         String?
+  address       String?
   businessName  String?
-  role          String             @default("USER")
+  description   String?
+  profileImage  String?  
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  emailVerified DateTime?
+  
   accounts      Account[]
-  plans         Plan[]
   sessions      Session[]
   subscriptions UserSubscription[]
+  plans         Plan[]
+  payouts       Payout[]
 }
 
 model VerificationToken {
@@ -59,14 +71,15 @@ model VerificationToken {
 }
 
 model Plan {
-  id            String             @id @default(cuid())
+  id            String   @id @default(cuid())
   name          String
   description   String?
   price         Float
-  interval      String
+  interval      String   // "monthly", "yearly", etc.
   merchantId    String
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
   merchant      User               @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   subscriptions UserSubscription[]
 }
@@ -75,11 +88,27 @@ model UserSubscription {
   id        String   @id @default(cuid())
   userId    String
   planId    String
+  status    String   @default("active") // "active", "cancelled", "expired"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  status    String   @default("active")
-  plan      Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
   @@unique([userId, planId])
+}
+
+model Payout {
+  id            String    @id @default(cuid())
+  merchantId    String
+  amount        Float
+  fee           Float
+  netAmount     Float
+  status        String    @default("scheduled") // "scheduled", "processing", "paid", "failed"
+  scheduledDate DateTime
+  paidDate      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  merchant User @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 }

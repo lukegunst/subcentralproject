@@ -6,10 +6,10 @@ export default function HomePage() {
       {/* Header */}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-blue-600">SubCentral</h1>
+          <h1 className="text-2xl font-bold text-black-600">SubCentral</h1>
           <nav className="space-x-4">
             <Link href="/auth/signin" className="text-gray-600 hover:text-gray-900">Sign In</Link>
-            <Link href="/auth/signup" className="bg-blue-600 text-white px-4 py-2 rounded-lg">Get Started</Link>
+            <Link href="/auth/signup" className="bg-gray-600 text-white px-4 py-2 rounded-lg">Get Started</Link>
           </nav>
         </div>
       </header>
@@ -23,8 +23,8 @@ export default function HomePage() {
           Businesses can offer monthly plans, and customers can manage all of their subscriptions in one place.
         </p>
         <div className="space-x-4">
-          <Link href="/auth/signup?role=merchant" className="bg-blue-600 text-white px-6 py-3 rounded-lg">
-            I'm a Business
+          <Link href="/auth/signup?role=merchant" className="bg-gray-600 text-white px-6 py-3 rounded-lg">
+            Merchant Login
           </Link>
           <Link href="/marketplace" className="bg-gray-100 text-gray-700 px-6 py-3 rounded-lg">
             Browse Marketplace

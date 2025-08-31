@@ -1,88 +1,84 @@
-'use client'
+"use client"
 
-import Link from "next/link"
 import { useSession, signOut } from "next-auth/react"
-
-interface ExtendedUser {
-  id?: string
-  email?: string | null
-  role?: string
-}
-
-interface ExtendedSession {
-  user?: ExtendedUser
-}
+import Link from "next/link"
+import { Menu } from "@headlessui/react"
 
 export default function Navbar() {
-  const { data: session, status } = useSession()
-  const extendedSession = session as ExtendedSession
-  const role = extendedSession?.user?.role
+  const { data: session } = useSession()
 
   return (
-    <nav className="bg-gray-900 text-white px-6 py-3 flex justify-between items-center">
-      <div className="flex gap-4">
-        <Link href="/" className="font-bold text-lg hover:text-gray-300">
-          SubCentral
-        </Link>
-        
-        {status === "authenticated" && role === "USER" && (
+    <nav className="p-4 bg-gray-800 text-white flex justify-between items-center">
+      {/* Left side nav links */}
+      <div className="flex space-x-6">
+        {!session?.user && (
           <>
-            <Link href="/marketplace" className="hover:text-gray-300">
-              Marketplace
-            </Link>
-            <Link href="/my-subscriptions" className="hover:text-gray-300">
-              My Subscriptions
-            </Link>
+            <Link href="/auth/signin" className="hover:underline">Sign In</Link>
+            <Link href="/auth/signup" className="hover:underline">Sign Up</Link>
           </>
         )}
-        
-        {status === "authenticated" && role === "MERCHANT" && (
+
+        {session?.user && session.user.role === "MERCHANT" && (
           <>
-            <Link href="/dashboard" className="hover:text-gray-300">
-              Dashboard
-            </Link>
-            <Link href="/dashboard/plans/new" className="hover:text-gray-300">
-              New Plan
-            </Link>
-            <Link href="/dashboard/subscribers" className="hover:text-gray-300">
-              Subscribers
-            </Link>
+            <Link href="/dashboard" className="hover:underline">Merchant Dashboard</Link>
+            <Link href="/dashboard/plans/new" className="hover:underline">Create New Plan</Link>
+          </>
+        )}
+
+        {session?.user && session.user.role === "CUSTOMER" && (
+          <>
+            <Link href="/marketplace" className="hover:underline">Marketplace</Link>
+            <Link href="/my-subscriptions" className="hover:underline">My Subscriptions</Link>
           </>
         )}
       </div>
 
-      <div>
-        {status === "loading" ? (
-          <span className="text-gray-400">Loading...</span>
-        ) : status === "authenticated" ? (
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-300">
-              {extendedSession.user?.email} ({role})
+      {/* Right side - Profile dropdown */}
+      {session?.user && (
+        <Menu as="div" className="relative inline-block text-left">
+          <Menu.Button className="flex items-center space-x-2 bg-gray-700 px-3 py-2 rounded hover:bg-gray-600">
+            {/* Avatar circle with initials */}
+            <div className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-500 text-white font-bold">
+              {session.user.name
+                ? session.user.name.charAt(0).toUpperCase()
+                : session.user.email.charAt(0).toUpperCase()}
+            </div>
+            <span className="hidden sm:block">
+              {session.user.name || session.user.email}
             </span>
-            <button
-              onClick={() => signOut({ callbackUrl: "/" })}
-              className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded transition-colors"
-            >
-              Logout
-            </button>
-          </div>
-        ) : (
-          <div className="flex gap-2">
-            <Link 
-              href="/auth/signin" 
-              className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded transition-colors"
-            >
-              Login
-            </Link>
-            <Link 
-              href="/auth/signup" 
-              className="bg-green-600 hover:bg-green-700 px-3 py-1 rounded transition-colors"
-            >
-              Sign Up
-            </Link>
-          </div>
-        )}
-      </div>
+          </Menu.Button>
+
+          {/* Dropdown items */}
+          <Menu.Items className="absolute right-0 mt-2 w-48 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none text-gray-800">
+            {session.user.role === "MERCHANT" && (
+              <Menu.Item>
+                {({ active }) => (
+                  <Link
+                    href="/profile"
+                    className={`block px-4 py-2 text-sm ${
+                      active ? "bg-gray-100" : ""
+                    }`}
+                  >
+                    Edit Profile
+                  </Link>
+                )}
+              </Menu.Item>
+            )}
+            <Menu.Item>
+              {({ active }) => (
+                <button
+                  onClick={() => signOut()}
+                  className={`block w-full text-left px-4 py-2 text-sm ${
+                    active ? "bg-gray-100" : ""
+                  }`}
+                >
+                  Sign Out
+                </button>
+              )}
+            </Menu.Item>
+          </Menu.Items>
+        </Menu>
+      )}
     </nav>
   )
 }

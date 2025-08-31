@@ -1,39 +1,33 @@
-'use client'
+"use client"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { toast } from "sonner"
+type CancelButtonProps = {
+  subscriptionId: string
+}
 
-export default function CancelButton({ subId }: { subId: string }) {
-  const [loading, setLoading] = useState(false)
-
+export default function CancelButton({ subscriptionId }: CancelButtonProps) {
   const handleCancel = async () => {
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/subscriptions/${subId}`, { method: "DELETE" })
+    if (!confirm("Are you sure you want to cancel this subscription?")) return
 
-      if (res.ok) {
-        toast.success("Subscription cancelled successfully")
+    try {
+      const response = await fetch(`/api/subscriptions/${subscriptionId}`, {
+        method: "DELETE",
+      })
+      if (response.ok) {
         window.location.reload()
       } else {
-        const err = await res.json()
-        toast.error(err.message || "Unable to cancel subscription")
+        alert("Failed to cancel subscription")
       }
-    } catch (e) {
-      console.error(e)
-      toast.error("Unexpected error occurred")
-    } finally {
-      setLoading(false)
+    } catch (error) {
+      alert("Error cancelling subscription")
     }
   }
 
   return (
-    <Button 
-      variant="destructive" 
+    <button
       onClick={handleCancel}
-      disabled={loading}
+      className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 text-sm"
     >
-      {loading ? "Cancelling..." : "Cancel"}
-    </Button>
+      Cancel
+    </button>
   )
 }
