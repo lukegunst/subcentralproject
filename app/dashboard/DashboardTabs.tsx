@@ -1,139 +1,304 @@
-"use client"
+'use client'
 
-import { useState } from "react"
+import { useState } from 'react'
+import Link from 'next/link'
 
-type Plan = {
+// Define types for our data (match Prisma returns)
+interface User {
   id: string
-  name: string
-  description: string | null
-  price: number
-  interval: string
-  subscriptions: {
-    id: string
-    user: {
-      id: string
-      email: string
-      name: string | null
-    }
-  }[]
+  name?: string | null
+  email: string
+  businessName?: string | null
 }
 
-type Payout = {
+interface Plan {
   id: string
+  name: string
+  description?: string | null
+  price: number
+  interval: string
+  merchantId?: string
+  merchant?: User | null
+  subscriptions?: Array<{
+    id: string
+    userId: string
+    user?: User
+  }>
+}
+
+interface Subscription {
+  id: string
+  status: string
+  plan: Plan & {
+    merchant?: User | null
+  }
+}
+
+interface Invoice {
+  id: string
+  pdfUrl?: string | null
+}
+
+interface Transaction {
+  id: string
+  createdAt: string | Date
   amount: number
   fee: number
   netAmount: number
   status: string
-  scheduledDate: Date
-  paidDate: Date | null
+  nextPayment?: string | Date | null
+  customer?: User | null
+  plan: Plan & { merchant?: User | null }
+  invoice?: Invoice | null
 }
 
-type Props = {
-  plans: Plan[]
-  payouts: Payout[]
+// Payout interface updated to match returned objects:
+// - allow status to be a string (or "pending" | "paid")
+// - accept paidAt OR paidDate (either may come from backend)
+// - include optional fields your backend may return (merchantId, fee, netAmount, createdAt, updatedAt)
+interface Payout {
+  id: string
+  amount: number
+  scheduledDate: string | Date
+  status: "pending" | "paid" | string
+  paidAt?: string | Date | null
+  paidDate?: string | Date | null
+  merchantId?: string
+  fee?: number
+  netAmount?: number
+  createdAt?: string | Date
+  updatedAt?: string | Date
 }
 
-export default function DashboardTabs({ plans, payouts }: Props) {
-  const [activeTab, setActiveTab] = useState<"plans" | "payouts">("plans")
+interface DashboardTabsProps {
+  plans?: Plan[]
+  subscriptions?: Subscription[]
+  transactions?: Transaction[]
+  payouts?: Payout[]
+  userRole: "MERCHANT" | "CUSTOMER"
+}
 
-  return (
-    <div className="bg-white rounded-lg shadow">
-      {/* Tab Headers */}
-      <div className="flex border-b">
-        <button
-          onClick={() => setActiveTab("plans")}
-          className={`px-6 py-4 font-medium ${
-            activeTab === "plans"
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          Plans & Subscribers ({plans.length})
-        </button>
-        <button
-          onClick={() => setActiveTab("payouts")}
-          className={`px-6 py-4 font-medium ${
-            activeTab === "payouts"
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          Payouts ({payouts.length})
-        </button>
-      </div>
+export default function DashboardTabs({ 
+  plans = [], 
+  subscriptions = [], 
+  transactions = [],
+  payouts = [],
+  userRole 
+}: DashboardTabsProps) {
+  const [activeTab, setActiveTab] = useState(userRole === "MERCHANT" ? "plans" : "subscriptions")
 
-      {/* Tab Content */}
-      <div className="p-6">
+  if (userRole === "MERCHANT") {
+    return (
+      <div>
+        {/* Merchant Tabs */}
+        <div className="border-b border-gray-200 mb-6">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab("plans")}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === "plans"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300"
+              }`}
+            >
+              My Plans ({plans.length})
+            </button>
+            <button
+              onClick={() => setActiveTab("transactions")}
+              className={`py-2 px-1 border-b-2 font-medium text-sm R{
+                activeTab === "transactions"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300"
+              }`}
+            >
+              Transactions ({transactions.length})
+            </button>
+            {/* ✅ Payouts Tab */}
+            <button
+              onClick={() => setActiveTab("payouts")}
+              className={`py-2 px-1 border-b-2 font-medium text-sm R{
+                activeTab === "payouts"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300"
+              }`}
+            >
+              Payouts ({payouts.length})
+            </button>
+          </nav>
+        </div>
+
+        {/* Tab Content */}
         {activeTab === "plans" && (
-          <div className="space-y-6">
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold">My Plans</h2>
+              <Link
+                href="/dashboard/plans/new"
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+              >
+                Create New Plan
+              </Link>
+            </div>
+            
             {plans.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500 mb-4">No plans created yet.</p>
-                <a
+              <div className="text-center py-12">
+                <p className="text-muted-foreground mb-4">You haven't created any plans yet.</p>
+                <Link
                   href="/dashboard/plans/new"
-                  className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
+                  className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
                 >
                   Create Your First Plan
-                </a>
+                </Link>
               </div>
             ) : (
-              plans.map((plan) => (
-                <PlanCard key={plan.id} plan={plan} />
-              ))
+              <div className="grid gap-4">
+                {plans.map((plan) => (
+                  <div key={plan.id} className="bg-card p-6 rounded-lg border">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-lg font-semibold">{plan.name}</h3>
+                        <p className="text-muted-foreground">{plan.description}</p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          {plan.subscriptions?.length ?? 0} subscriber(s)
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Owner: {plan.merchant?.businessName ?? plan.merchant?.name ?? '—'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold">R{plan.price.toFixed(2)}</p>
+                        <p className="text-sm text-muted-foreground">/{plan.interval}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}
 
-        {activeTab === "payouts" && (
+        {activeTab === "transactions" && (
           <div>
-            {payouts.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500">No payouts scheduled yet.</p>
-                <p className="text-sm text-gray-400 mt-2">
-                  Payouts will appear here once you have active subscribers.
-                </p>
+            <h2 className="text-xl font-semibold mb-6">Transactions</h2>
+            {transactions.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">No transactions yet.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="min-w-full border border-gray-200 rounded-lg">
                   <thead>
-                    <tr className="text-left border-b">
-                      <th className="py-3 px-4">Scheduled Date</th>
-                      <th className="py-3 px-4">Amount</th>
-                      <th className="py-3 px-4">Fee</th>
-                      <th className="py-3 px-4">Net Amount</th>
-                      <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4">Paid Date</th>
+                    <tr className="bg-gray-50">
+                      <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Date</th>
+                      <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Plan</th>
+                      <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Customer</th>
+                      <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Amount</th>
+                      <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Fee</th>
+                      <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Net</th>
+                      <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Status</th>
+                      <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Invoice</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.map((tx) => (
+                      <tr key={tx.id} className="hover:bg-gray-50">
+                        <td className="p-3 border-b text-sm">
+                          {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : '-'}
+                        </td>
+                        <td className="p-3 border-b text-sm font-medium">{tx.plan?.name}</td>
+                        <td className="p-3 border-b text-sm">
+                          {tx.customer?.name ?? tx.customer?.email ?? '-'}
+                        </td>
+                        <td className="p-3 border-b text-sm font-medium">R{tx.amount.toFixed(2)}</td>
+                        <td className="p-3 border-b text-sm text-red-600">-R{tx.fee.toFixed(2)}</td>
+                        <td className="p-3 border-b text-sm font-medium text-green-600">
+                          R{tx.netAmount.toFixed(2)}
+                        </td>
+                        <td className="p-3 border-b text-sm">
+                          <span className={`px-2 py-1 rounded-full text-xs R{
+                            tx.status === "paid" 
+                              ? "bg-green-100 text-green-800" 
+                              : "bg-yellow-100 text-yellow-800"
+                          }`}>
+                            {tx.status}
+                          </span>
+                        </td>
+                        <td className="p-3 border-b text-sm">
+                          <a 
+                            href={tx.invoice?.pdfUrl ?? "#"} 
+                            className="text-blue-600 hover:underline"
+                          >
+                            View Invoice
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ✅ Payouts Tab Content */}
+        {activeTab === "payouts" && (
+          <div>
+            <h2 className="text-xl font-semibold mb-6">Payouts</h2>
+            {payouts.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">No payouts scheduled yet.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full border border-gray-200 rounded-lg">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Scheduled Date</th>
+                      <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Status</th>
+                      <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Amount</th>
+                      <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Paid At</th>
+                      <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {payouts.map((payout) => (
-                      <tr key={payout.id} className="border-b hover:bg-gray-50">
-                        <td className="py-3 px-4">
-                          {new Date(payout.scheduledDate).toLocaleDateString()}
-                        </td>
-                        <td className="py-3 px-4">${payout.amount.toFixed(2)}</td>
-                        <td className="py-3 px-4">${payout.fee.toFixed(2)}</td>
-                        <td className="py-3 px-4 font-semibold">
-                          ${payout.netAmount.toFixed(2)}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span
-                            className={`px-3 py-1 rounded-full text-sm font-medium ${
-                              payout.status === "paid"
-                                ? "bg-green-100 text-green-800"
-                                : payout.status === "processing"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-gray-100 text-gray-700"
-                            }`}
-                          >
+                      <tr key={payout.id} className="hover:bg-gray-50">
+                        <td className="p-3 border-b text-sm">
+  { (payout.paidAt ?? payout.paidDate) ? new Date(payout.paidAt ?? payout.paidDate as string | Date).toLocaleDateString() : "-" }
+</td>
+<td className="p-3 border-b text-sm">
+  {payout.status !== "paid" ? (
+    <button
+      onClick={async () => {
+        const res = await fetch(`/api/payouts/R{payout.id}/pay`, { method: "POST" })
+        if (res.ok) {
+          const updated = await res.json()
+          // Optional: update local state to reflect change
+          alert("Payout marked as paid")
+        } else {
+          alert("Failed to mark payout as paid")
+        }
+      }}
+      className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+    >
+      Mark Paid
+    </button>
+  ) : (
+    <span className="text-green-600 font-medium">Paid</span>
+  )}
+</td>
+                        <td className="p-3 border-b text-sm font-medium">R{payout.amount.toFixed(2)}</td>
+                        <td className="p-3 border-b text-sm">
+                          <span className={`px-2 py-1 rounded-full text-xs ${
+                            payout.status === "paid"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-yellow-100 text-yellow-800"
+                          }`}>
                             {payout.status}
                           </span>
                         </td>
-                        <td className="py-3 px-4">
-                          {payout.paidDate
-                            ? new Date(payout.paidDate).toLocaleDateString()
-                            : "—"}
+                        <td className="p-3 border-b text-sm">
+                          { (payout.paidAt ?? payout.paidDate) ? new Date(payout.paidAt ?? payout.paidDate as string | Date).toLocaleDateString() : "-" }
                         </td>
                       </tr>
                     ))}
@@ -144,58 +309,146 @@ export default function DashboardTabs({ plans, payouts }: Props) {
           </div>
         )}
       </div>
-    </div>
-  )
-}
+    )
+  }
 
-// Individual Plan Card Component
-function PlanCard({ plan }: { plan: Plan }) {
-  const [showSubscribers, setShowSubscribers] = useState(false)
-
+  // Customer Dashboard
   return (
-    <div className="border rounded-lg p-6 bg-gray-50">
-      <div className="flex justify-between items-start mb-4">
-        <div className="flex-1">
-          <h3 className="text-xl font-semibold">{plan.name}</h3>
-          <p className="text-gray-600 mt-1">{plan.description}</p>
-          <p className="text-lg font-bold text-green-600 mt-2">
-            ${plan.price}/{plan.interval}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-sm text-gray-500">Subscribers</p>
-          <p className="text-3xl font-bold text-blue-600">{plan.subscriptions.length}</p>
-        </div>
+    <div>
+      {/* Customer Tabs */}
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab("subscriptions")}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === "subscriptions"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300"
+            }`}
+          >
+            My Subscriptions ({subscriptions.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("transactions")}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === "transactions"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300"
+            }`}
+          >
+            Transactions ({transactions.length})
+          </button>
+        </nav>
       </div>
 
-      {plan.subscriptions.length > 0 && (
+      {/* Tab Content */}
+      {activeTab === "subscriptions" && (
         <div>
-          <button
-            onClick={() => setShowSubscribers(!showSubscribers)}
-            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-          >
-            {showSubscribers ? "Hide" : "Show"} Subscribers
-          </button>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold">My Subscriptions</h2>
+            <Link
+              href="/marketplace"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+            >
+              Browse Marketplace
+            </Link>
+          </div>
 
-          {showSubscribers && (
-            <div className="mt-4 bg-white rounded border p-4">
-              <h4 className="font-medium mb-3">Subscribers ({plan.subscriptions.length})</h4>
-              <div className="space-y-2">
-                {plan.subscriptions.map((subscription) => (
-                  <div
-                    key={subscription.id}
-                    className="flex justify-between items-center py-2 px-3 bg-gray-50 rounded"
-                  >
+          {subscriptions.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground mb-4">You don't have any active subscriptions.</p>
+              <Link
+                href="/marketplace"
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+              >
+                Explore Plans
+              </Link>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {subscriptions.map((subscription) => (
+                <div key={subscription.id} className="bg-card p-6 rounded-lg border">
+                  <div className="flex justify-between items-start">
                     <div>
-                      <p className="font-medium">
-                        {subscription.user.name || "No name"}
+                      <h3 className="text-lg font-semibold">{subscription.plan.name}</h3>
+                      <p className="text-muted-foreground">{subscription.plan.description}</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        by {subscription.plan.merchant?.businessName ?? subscription.plan.merchant?.name ?? '-'}
                       </p>
-                      <p className="text-sm text-gray-600">{subscription.user.email}</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Status: <span className="capitalize">{subscription.status}</span>
+                      </p>
                     </div>
-                    <span className="text-sm text-green-600 font-medium">Active</span>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-green-600">
+                        R{subscription.plan.price}/{subscription.plan.interval}
+                      </p>
+                      <button className="mt-2 text-sm text-red-600 hover:underline">
+                        Cancel Subscription
+                      </button>
+                    </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "transactions" && (
+        <div>
+          <h2 className="text-xl font-semibold mb-6">My Transactions</h2>
+          {transactions.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No transactions yet.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full border border-gray-200 rounded-lg">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Date</th>
+                    <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Plan</th>
+                    <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Business</th>
+                    <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Amount</th>
+                    <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Next Payment</th>
+                    <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Status</th>
+                    <th className="p-3 border-b text-left text-sm font-medium text-gray-700">Invoice</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map((tx) => (
+                    <tr key={tx.id} className="hover:bg-gray-50">
+                      <td className="p-3 border-b text-sm">
+                        {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : '-'}
+                      </td>
+                      <td className="p-3 border-b text-sm font-medium">{tx.plan.name}</td>
+                      <td className="p-3 border-b text-sm">{tx.plan.merchant?.businessName ?? tx.plan.merchant?.name ?? '-'}</td>
+                      <td className="p-3 border-b text-sm font-medium">R{tx.amount.toFixed(2)}</td>
+                      <td className="p-3 border-b text-sm">
+                        {tx.nextPayment ? new Date(tx.nextPayment as string | Date).toLocaleDateString() : "-"}
+                      </td>
+                      <td className="p-3 border-b text-sm">
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          tx.status === "paid" 
+                            ? "bg-green-100 text-green-800" 
+                            : "bg-yellow-100 text-yellow-800"
+                        }`}>
+                          {tx.status}
+                        </span>
+                      </td>
+                      <td className="p-3 border-b text-sm">
+                        <a 
+                          href={tx.invoice?.pdfUrl ?? "#"} 
+                          className="text-blue-600 hover:underline"
+                        >
+                          View Invoice
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

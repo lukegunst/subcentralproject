@@ -28,7 +28,7 @@ export default function Navbar() {
         {session?.user && session.user.role === "CUSTOMER" && (
           <>
             <Link href="/marketplace" className="hover:underline">Marketplace</Link>
-            <Link href="/my-subscriptions" className="hover:underline">My Subscriptions</Link>
+            <Link href="/dashboard" className="hover:underline">My Dashboard</Link>
           </>
         )}
       </div>
@@ -36,9 +36,9 @@ export default function Navbar() {
       {/* Right side - Profile dropdown */}
       {session?.user && (
         <Menu as="div" className="relative inline-block text-left">
-          <Menu.Button className="flex items-center space-x-2 bg-gray-700 px-3 py-2 rounded hover:bg-gray-600">
+          <Menu.Button className="flex items-center space-x-2 bg-white-700 px-3 py-2 rounded hover:bg-white-600">
             {/* Avatar circle with initials */}
-            <div className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-500 text-white font-bold">
+            <div className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-800 text-gray font-bold">
               {session.user.name
                 ? session.user.name.charAt(0).toUpperCase()
                 : session.user.email.charAt(0).toUpperCase()}

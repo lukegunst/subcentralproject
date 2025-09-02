@@ -28,48 +28,28 @@ export default async function DashboardPage() {
       orderBy: { createdAt: "desc" },
     })
 
+    // ✅ FIXED: Include full plan object for customer transactions
+    const transactions = await prisma.transaction.findMany({
+      where: { userId: user.id },
+      include: {
+        plan: {
+          include: { 
+            merchant: { select: { id: true, name: true, email: true, businessName: true } } 
+          },
+        },
+        invoice: true,
+      },
+      orderBy: { createdAt: "desc" },
+    })
+
     return (
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">My Subscriptions</h1>
-        {subscriptions.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500 mb-4">You don't have any subscriptions yet.</p>
-            <a
-              href="/marketplace"
-              className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
-            >
-              Browse Marketplace
-            </a>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {subscriptions.map((subscription) => (
-              <div key={subscription.id} className="bg-white border rounded-lg p-6 shadow">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h2 className="text-xl font-semibold">{subscription.plan.name}</h2>
-                    <p className="text-gray-600">{subscription.plan.description}</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Merchant: {subscription.plan.merchant.name || subscription.plan.merchant.email}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-green-600">
-                      ${subscription.plan.price}/{subscription.plan.interval}
-                    </p>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      subscription.status === "active"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-red-100 text-red-800"
-                    }`}>
-                      {subscription.status}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <h1 className="text-3xl font-bold mb-8">My Dashboard</h1>
+        <DashboardTabs 
+          subscriptions={subscriptions} 
+          transactions={transactions} 
+          userRole="CUSTOMER" 
+        />
       </div>
     )
   }
@@ -85,10 +65,45 @@ export default async function DashboardPage() {
     orderBy: { createdAt: "desc" },
   })
 
-  const payouts = await prisma.payout.findMany({
+  // ✅ FIXED: Include full plan object for merchant transactions
+  const transactions = await prisma.transaction.findMany({
+    where: { merchantId: user.id },
+    include: {
+      customer: { select: { id: true, name: true, email: true } },
+      plan: {
+        include: { 
+          merchant: { select: { id: true, name: true, email: true, businessName: true } } 
+        },
+      },
+      invoice: true,
+    },
+    orderBy: { createdAt: "desc" },
+  })
+
+  // Fetch raw payouts
+  const payoutsRaw = await prisma.payout.findMany({
     where: { merchantId: user.id },
     orderBy: { scheduledDate: "desc" },
   })
+
+  // Normalize payouts so DashboardTabs receives the expected shape:
+  // - status limited to "paid" | "pending" (or fallback to string if needed)
+  // - ensure paidAt exists (map paidDate -> paidAt if backend uses that)
+  const payouts = payoutsRaw.map((p) => ({
+    id: p.id,
+    merchantId: p.merchantId,
+    amount: p.amount,
+    // keep Date objects (server side) — DashboardTabs will call new Date(...) when rendering
+    scheduledDate: p.scheduledDate,
+    // normalize status to either 'paid' or 'pending' (leave other strings through as fallback)
+    status: p.status === "paid" ? "paid" : p.status === "pending" ? "pending" : p.status,
+    // normalized paidAt (some rows may use paidAt, others paidDate)
+    paidAt: (p as any).paidAt ?? (p as any).paidDate ?? null,
+    fee: (p as any).fee ?? undefined,
+    netAmount: (p as any).netAmount ?? undefined,
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
+  }))
 
   const totalSubscribers = plans.reduce((acc, p) => acc + p.subscriptions.length, 0)
   const monthlyRevenue = plans.reduce(
@@ -105,20 +120,25 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-2">Total Plans</h3>
-          <p className="text-3xl font-bold text-blue-600">{plans.length}</p>
+          <p className="text-2xl font-bold text-gray-600">{plans.length}</p>
         </div>
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-2">Total Subscribers</h3>
-          <p className="text-3xl font-bold text-green-600">{totalSubscribers}</p>
+          <p className="text-2xl font-bold text-gray-600">{totalSubscribers}</p>
         </div>
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-2">Monthly Revenue</h3>
-          <p className="text-3xl font-bold text-purple-600">${monthlyRevenue.toFixed(2)}</p>
+          <p className="text-2xl font-bold text-green-600">R{monthlyRevenue.toFixed(2)}</p>
         </div>
       </div>
 
       {/* 🗂️ Tabbed Content */}
-      <DashboardTabs plans={plans} payouts={payouts} />
+      <DashboardTabs 
+        plans={plans} 
+        transactions={transactions} 
+        payouts={payouts} 
+        userRole="MERCHANT" 
+      />
     </div>
   )
 }

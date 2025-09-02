@@ -38,28 +38,32 @@ model Session {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  password      String
-  name          String?
-  role          String    @default("CUSTOMER")
-  
+  id       String  @id @default(cuid())
+  email    String  @unique
+  password String
+  name     String?
+  role     String  @default("CUSTOMER")
+
   // ✅ Profile fields
-  phone         String?
-  address       String?
-  businessName  String?
-  description   String?
-  profileImage  String?  
-  
+  phone        String?
+  address      String?
+  businessName String?
+  description  String?
+  profileImage String?
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   emailVerified DateTime?
-  
+
   accounts      Account[]
   sessions      Session[]
   subscriptions UserSubscription[]
   plans         Plan[]
   payouts       Payout[]
+
+  // ✅ back-relations
+  customerTransactions Transaction[] @relation("CustomerTransactions")
+  merchantTransactions Transaction[] @relation("MerchantTransactions")
 }
 
 model VerificationToken {
@@ -71,17 +75,19 @@ model VerificationToken {
 }
 
 model Plan {
-  id            String   @id @default(cuid())
-  name          String
-  description   String?
-  price         Float
-  interval      String   // "monthly", "yearly", etc.
-  merchantId    String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Float
+  interval    String // "monthly", "yearly", etc.
+  imageUrl    String?
+  merchantId  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   merchant      User               @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   subscriptions UserSubscription[]
+  transactions  Transaction[]
 }
 
 model UserSubscription {
@@ -101,6 +107,7 @@ model UserSubscription {
 model Payout {
   id            String    @id @default(cuid())
   merchantId    String
+  transactionId String   @unique
   amount        Float
   fee           Float
   netAmount     Float
@@ -110,5 +117,34 @@ model Payout {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  merchant User @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  merchant    User?        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  transaction Transaction @relation(fields: [transactionId], references: [id])
+}
+
+model Transaction {
+  id          String    @id @default(cuid())
+  userId      String
+  planId      String
+  merchantId  String
+  amount      Float
+  fee         Float
+  netAmount   Float
+  status      String    @default("pending")
+  createdAt   DateTime  @default(now())
+  nextPayment DateTime?
+  payout      Payout?
+
+  customer User     @relation("CustomerTransactions", fields: [userId], references: [id])
+  merchant User     @relation("MerchantTransactions", fields: [merchantId], references: [id])
+  plan     Plan     @relation(fields: [planId], references: [id])
+  invoice  Invoice?
+}
+
+model Invoice {
+  id            String   @id @default(cuid())
+  transactionId String   @unique
+  pdfUrl        String?
+  createdAt     DateTime @default(now())
+
+  transaction Transaction @relation(fields: [transactionId], references: [id])
 }

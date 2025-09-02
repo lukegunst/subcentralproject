@@ -11,8 +11,9 @@ export async function GET() {
           select: {
             id: true,
             email: true,
-            name: true,  // 👈 Changed from businessName to name
-          }
+            name: true,
+            businessName: true, // include businessName for display
+          },
         },
         subscriptions: true,
       },
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { name, description, price, interval } = await request.json()
+    const { name, description, price, interval, imageUrl } = await request.json()
 
     if (!name || !price || !interval) {
       return NextResponse.json(
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
         description,
         price: parseFloat(price),
         interval,
+        imageUrl, // Save the uploaded image URL here
         merchantId: (session.user as any).id,
       },
       include: {
@@ -61,13 +63,19 @@ export async function POST(request: NextRequest) {
           select: {
             id: true,
             email: true,
-            name: true,  // 👈 Changed from businessName to name
-          }
-        }
-      }
+            name: true,
+            businessName: true,
+          },
+        },
+      },
     })
 
     return NextResponse.json(plan, { status: 201 })
   } catch (error) {
     console.error("Error creating plan:", error)
-    return NextResponse.json}}
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    )
+  }
+}

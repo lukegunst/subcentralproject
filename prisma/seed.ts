@@ -4,6 +4,7 @@ async function main() {
   await prisma.payout.create({
     data: {
       merchantId: "MERCHANT_USER_ID_HERE",
+      transactionId:transaction.Id,
       amount: 500,
       fee: 25,
       netAmount: 475,
